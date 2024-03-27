@@ -5,23 +5,26 @@ const { performance } = require('perf_hooks');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configuration
-const WINDOW_SIZE = 10;
-const TEST_SERVER_URL = "http://20.244.56.144/"; // Replace with actual test server URL
-const QUALIFIED_IDS = new Set(['prime', 'fibo', 'even', 'random']); // Full form for local API, short form for test server
 
-const numberCache = [];
+const WINDOW_SIZE = 10;
+const TEST_SERVER_URL = "http://20.244.56.144"; 
+const QUALIFIED_IDS_SHORT = ['p', 'f', 'e', 'r']; 
+const QUALIFIED_IDS_MAP = {
+    'p': 'prime',
+    'f': 'fibo',
+    'e': 'even',
+    'r': 'rand'
+}; 
+
+const numberCache = {};
 
 const fetchAndUpdateCache = async (qualifiedId) => {
-    const url = `${TEST_SERVER_URL}/numbers/${qualifiedId}`;
+    const fullQualifiedId = QUALIFIED_IDS_MAP[qualifiedId];
+    const url = `${TEST_SERVER_URL}/numbers/${fullQualifiedId}`;
     try {
         const response = await axios.get(url, { timeout: 500 });
         const numbers = response.data;
-        numbers.forEach(number => {
-            if (!numberCache.includes(number)) {
-                numberCache.push(number);
-            }
-        });
+        numberCache[qualifiedId] = numbers;
     } catch (error) {
         console.error("Error fetching numbers:", error);
     }
@@ -33,15 +36,14 @@ const getAverage = (numbers) => {
     return (sum / numbers.length).toFixed(2);
 };
 
-app.get('/numbers/:qualifiedId', async (req, res) => {
-    const qualifiedId = req.params.qualifiedId;
-    if (!QUALIFIED_IDS.has(qualifiedId)) {
+const handleRequest = async (qualifiedId, res) => {
+    if (!QUALIFIED_IDS_SHORT.includes(qualifiedId)) {
         return res.status(400).json({ error: 'Invalid qualified ID' });
     }
 
     const start = performance.now();
     await fetchAndUpdateCache(qualifiedId);
-    const currentNumbers = numberCache.slice(-WINDOW_SIZE);
+    const currentNumbers = numberCache[qualifiedId] || [];
     const previousNumbers = currentNumbers.slice(0, -1);
     const average = getAverage(currentNumbers);
 
@@ -54,6 +56,11 @@ app.get('/numbers/:qualifiedId', async (req, res) => {
         windowCurrState: currentNumbers,
         avg: average
     });
+};
+
+app.get('/numbers/:qualifiedId', (req, res) => {
+    const qualifiedId = req.params.qualifiedId;
+    handleRequest(qualifiedId, res);
 });
 
 app.listen(PORT, () => {
