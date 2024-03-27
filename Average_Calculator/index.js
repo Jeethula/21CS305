@@ -1,68 +1,52 @@
-const express = require('express');
-const axios = require('axios');
-const { performance } = require('perf_hooks');
+var express = require('express');
+var app = express();
+var axios = require('axios')
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+app.get('/', function (req, res) {
+   res.send('Afford Medical test');
+})
 
+function add(accumulator, a) {
+    return accumulator + a;
+  }
 
-const WINDOW_SIZE = 10;
-const TEST_SERVER_URL = "http://20.244.56.144"; 
-const QUALIFIED_IDS_SHORT = ['p', 'f', 'e', 'r']; 
-const QUALIFIED_IDS_MAP = {
-    'p': 'prime',
-    'f': 'fibo',
-    'e': 'even',
-    'r': 'rand'
-}; 
+const prev = {
+    'e':[],
+    "r":[],
+    "p":[],
+    "f":[]
+    
+}
+const request = {
+    "e":"even",
+    "r":"rand",
+    "f":"fibo",
+    "p":"primes"
+}
+app.get("/number/:id",async(req,res)=>{
+try {
+    
 
-const numberCache = {};
-
-const fetchAndUpdateCache = async (qualifiedId) => {
-    const fullQualifiedId = QUALIFIED_IDS_MAP[qualifiedId];
-    const url = `${TEST_SERVER_URL}/numbers/${fullQualifiedId}`;
-    try {
-        const response = await axios.get(url, { timeout: 500 });
-        const numbers = response.data;
-        numberCache[qualifiedId] = numbers;
-    } catch (error) {
-        console.error("Error fetching numbers:", error);
-    }
-};
-
-const getAverage = (numbers) => {
-    if (numbers.length === 0) return 0;
-    const sum = numbers.reduce((acc, num) => acc + num, 0);
-    return (sum / numbers.length).toFixed(2);
-};
-
-const handleRequest = async (qualifiedId, res) => {
-    if (!QUALIFIED_IDS_SHORT.includes(qualifiedId)) {
-        return res.status(400).json({ error: 'Invalid qualified ID' });
+     let id = req.params.id
+    if (!(id in request)) {
+        return res.status(400).json({ error: 'Invalid id' });
     }
 
-    const start = performance.now();
-    await fetchAndUpdateCache(qualifiedId);
-    const currentNumbers = numberCache[qualifiedId] || [];
-    const previousNumbers = currentNumbers.slice(0, -1);
-    const average = getAverage(currentNumbers);
+const r = await axios.get(`http://20.244.56.144/numbers/${request[id]}`);
+curr = r.data.numbers
+const result = {}
+result["numbers"] = curr
+result["windowPrevState"] = prev[id] 
+result["windowCurrState"] = curr 
+let avg = curr.reduce(add, 0)
+result["avg"] = avg
+prev[id] = curr
+return res.json(result)
+} catch (error) {
+    return res.status(500).json({"error":"unable to handle"})
+}
+})
 
-    const end = performance.now();
-    console.log(`Request processed in ${end - start} milliseconds`);
-
-    res.json({
-        numbers: currentNumbers,
-        windowPrevState: previousNumbers,
-        windowCurrState: currentNumbers,
-        avg: average
-    });
-};
-
-app.get('/numbers/:qualifiedId', (req, res) => {
-    const qualifiedId = req.params.qualifiedId;
-    handleRequest(qualifiedId, res);
-});
-
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+var server = app.listen(3000, function () {
+   console.log("Express App running at 3000");
+})
